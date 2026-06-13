@@ -46,7 +46,9 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
@@ -80,6 +82,11 @@ import com.codex9990.bookautocapture.capture.CaptureDecision
 import com.codex9990.bookautocapture.capture.CaptureSettings
 import com.codex9990.bookautocapture.capture.CaptureState
 import com.codex9990.bookautocapture.capture.FrameMetrics
+import com.codex9990.bookautocapture.capture.QualityAssessment
+import com.codex9990.bookautocapture.capture.QualityAssessor
+import com.codex9990.bookautocapture.capture.QualityIssue
+import com.codex9990.bookautocapture.capture.QualityLevel
+import com.codex9990.bookautocapture.capture.QualitySignal
 import com.codex9990.bookautocapture.capture.Sensitivity
 import java.io.File
 import java.time.LocalDateTime
@@ -376,13 +383,29 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun handleFrameMetrics(metrics: FrameMetrics) {
-        if (!uiState.isRunning || uiState.isCapturing) return
+        val settings = uiState.toCaptureSettings()
+        val assessment = QualityAssessor.assess(metrics, settings)
+        var nextState = uiState
+        if (assessment != nextState.qualityAssessment) {
+            nextState = nextState.copy(qualityAssessment = assessment)
+        }
 
-        stateMachine.settings = uiState.toCaptureSettings()
+        if (!nextState.isRunning || nextState.isCapturing) {
+            if (nextState != uiState) {
+                uiState = nextState
+            }
+            return
+        }
+
+        stateMachine.settings = settings
         val decision = stateMachine.onFrame(metrics)
         val statusText = decision.toStatusText()
-        if (statusText != uiState.statusText) {
-            uiState = uiState.copy(statusText = statusText, errorMessage = null)
+        if (statusText != nextState.statusText) {
+            nextState = nextState.copy(statusText = statusText, errorMessage = null)
+        }
+
+        if (nextState != uiState) {
+            uiState = nextState
         }
 
         if (decision.shouldCapture) {
@@ -603,6 +626,7 @@ private data class CaptureUiState(
     val sessionFolder: String = "",
     val saveFolder: String = "Pictures/BookAutoCapture",
     val lastFileName: String = "-",
+    val qualityAssessment: QualityAssessment? = null,
     val capturedPages: List<CapturedPage> = emptyList()
 )
 
@@ -802,6 +826,8 @@ private fun ControlPanel(
 
             StatusSummaryPanel(uiState = uiState)
 
+            QualityPanel(assessment = uiState.qualityAssessment)
+
             SwitchRow(
                 label = "撮影音",
                 checked = uiState.soundEnabled,
@@ -915,6 +941,82 @@ private fun StatusSummaryPanel(uiState: CaptureUiState) {
                 )
             }
         }
+    }
+}
+
+@Composable
+@OptIn(ExperimentalLayoutApi::class)
+private fun QualityPanel(assessment: QualityAssessment?) {
+    val accentColor = assessment?.level.qualityColor()
+    Surface(
+        color = accentColor.copy(alpha = 0.12f),
+        shape = RoundedCornerShape(8.dp)
+    ) {
+        Column(
+            modifier = Modifier.padding(14.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = "品質チェック",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.secondary
+                    )
+                    Text(
+                        text = assessment?.level.displayName(),
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        color = accentColor
+                    )
+                }
+                Text(
+                    text = assessment?.adviceText() ?: "プレビュー待ち",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.secondary,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                QualitySignalLabel(label = "明るさ", signal = assessment?.brightness)
+                QualitySignalLabel(label = "ブレ", signal = assessment?.sharpness)
+                QualitySignalLabel(label = "安定", signal = assessment?.stability)
+            }
+        }
+    }
+}
+
+@Composable
+private fun QualitySignalLabel(
+    label: String,
+    signal: QualitySignal?
+) {
+    val color = signal.qualityColor()
+    Row(
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Spacer(
+            modifier = Modifier
+                .size(8.dp)
+                .background(color, CircleShape)
+        )
+        Text(
+            text = "$label ${signal.displayName()}",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurface,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
     }
 }
 
@@ -1123,6 +1225,55 @@ private fun SettingSlider(
             onValueChange = onValueChange,
             colors = SliderDefaultsCompat.colors()
         )
+    }
+}
+
+@Composable
+private fun QualityLevel?.qualityColor(): Color {
+    return when (this) {
+        QualityLevel.GOOD -> MaterialTheme.colorScheme.primary
+        QualityLevel.CHECK -> MaterialTheme.colorScheme.tertiary
+        QualityLevel.BLOCKED -> Color(0xFF8A2E16)
+        null -> MaterialTheme.colorScheme.secondary
+    }
+}
+
+private fun QualityLevel?.displayName(): String {
+    return when (this) {
+        QualityLevel.GOOD -> "良好"
+        QualityLevel.CHECK -> "注意"
+        QualityLevel.BLOCKED -> "撮影しません"
+        null -> "計測中"
+    }
+}
+
+@Composable
+private fun QualitySignal?.qualityColor(): Color {
+    return when (this) {
+        QualitySignal.GOOD -> MaterialTheme.colorScheme.primary
+        QualitySignal.CHECK -> MaterialTheme.colorScheme.tertiary
+        QualitySignal.BLOCKED -> Color(0xFF8A2E16)
+        null -> MaterialTheme.colorScheme.secondary
+    }
+}
+
+private fun QualitySignal?.displayName(): String {
+    return when (this) {
+        QualitySignal.GOOD -> "OK"
+        QualitySignal.CHECK -> "注意"
+        QualitySignal.BLOCKED -> "NG"
+        null -> "待ち"
+    }
+}
+
+private fun QualityAssessment.adviceText(): String {
+    return when (issues.firstOrNull()) {
+        QualityIssue.TOO_DARK -> "照明を明るく"
+        QualityIssue.LOW_LIGHT -> "少し暗め"
+        QualityIssue.TOO_BLURRY -> "揺れを止めて"
+        QualityIssue.LOW_SHARPNESS -> "文字が甘め"
+        QualityIssue.MOVING -> "止まると撮影"
+        null -> "このまま撮れます"
     }
 }
 

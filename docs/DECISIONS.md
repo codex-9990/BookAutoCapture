@@ -78,3 +78,14 @@ The app is used while a phone is fixed above a book, so the main action should b
 
 Consequence:
 Manual capture is disabled during auto capture. Users stop auto capture before deleting the latest page or taking a manual replacement shot.
+
+## 2026-06-14: Lightweight Quality Feedback Before OCR
+
+Decision:
+Use the existing luma analysis to show live brightness, blur, and stability quality before adding OCR or AI features.
+
+Why:
+The most useful next polish is preventing bad captures before they happen. Reusing the existing frame metrics keeps the app fast, local-first, and dependency-light.
+
+Consequence:
+The app now gives simple `良好` / `注意` / `撮影しません` feedback. Thresholds still need real-device tuning before treating the result as a final document-quality score.

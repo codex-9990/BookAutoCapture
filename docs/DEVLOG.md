@@ -19,6 +19,13 @@ This file is the chronological memory of the project. Keep entries short, concre
 - Grouped save path, last filename, and recent saved pages into one session section.
 - Disabled manual capture while auto capture is running to reduce accidental double captures.
 
+### Quality Check Polish
+
+- Added a lightweight quality assessment model for brightness, blur, and stability.
+- Added a live quality panel showing `良好`, `注意`, or `撮影しません` before capture.
+- Shared darkness and blur thresholds between auto-capture blocking and quality display.
+- Added unit tests for good, caution, blocked, moving, and disabled-check cases.
+
 ### Verification
 
 Passed:

@@ -25,6 +25,7 @@ BookAutoCapture is an Android/Kotlin app for fixed-position book capture. The cu
 - Stable-duration and minimum-capture-interval settings
 - Sensitivity setting: low, medium, high
 - Simplified control panel with one primary start/stop action
+- Live quality panel for brightness, blur, and stability before capture
 - Optional blur and darkness checks
 - Capture-complete sound toggle
 - Notice that system shutter sound may still play depending on device policy
@@ -32,7 +33,7 @@ BookAutoCapture is an Android/Kotlin app for fixed-position book capture. The cu
 - Portrait layout with preview above and controls below
 - Screen-awake mode while auto capture is running
 - Startup cleanup of `cacheDir/tmp`
-- Unit tests for the auto-capture state machine
+- Unit tests for the auto-capture state machine and quality assessment
 - README with build, device-test, save-path, and limitation notes
 
 ## Verified Commands
@@ -59,7 +60,7 @@ Build outputs are intentionally ignored by Git. GitHub Actions can upload a debu
 ## Known Issues
 
 - Real-device behavior has not been fully tuned across multiple Android vendors.
-- Blur and darkness thresholds are simple luma-based heuristics and will need real capture samples.
+- Quality, blur, and darkness thresholds are simple luma-based heuristics and will need real capture samples.
 - The UI is functional, but it still needs real-device polish on small phones and tablets.
 - The saved page list and delete-last action are in-memory for the current app session only.
 - No OCR, PDF export, page review screen, or session gallery exists yet.
@@ -81,6 +82,7 @@ Use an actual Android device and verify:
 3. Auto capture after a page turn.
 4. Screen stays awake while auto capture is running.
 5. Saved image orientation is correct in the gallery.
-6. No UI panel overlaps the camera preview while scrolling detailed settings.
-7. The saved page list updates after each capture.
-8. `最後を削除` removes the newest saved image after auto capture is stopped.
+6. Quality panel changes between good, caution, and blocked in realistic lighting and motion.
+7. No UI panel overlaps the camera preview while scrolling detailed settings.
+8. The saved page list updates after each capture.
+9. `最後を削除` removes the newest saved image after auto capture is stopped.

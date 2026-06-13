@@ -15,6 +15,19 @@ enum class Sensitivity {
     HIGH
 }
 
+data class MotionThresholds(
+    val moveThreshold: Double,
+    val stableThreshold: Double
+)
+
+fun Sensitivity.motionThresholds(): MotionThresholds {
+    return when (this) {
+        Sensitivity.LOW -> MotionThresholds(moveThreshold = 18.0, stableThreshold = 4.5)
+        Sensitivity.MEDIUM -> MotionThresholds(moveThreshold = 12.0, stableThreshold = 3.5)
+        Sensitivity.HIGH -> MotionThresholds(moveThreshold = 8.0, stableThreshold = 3.0)
+    }
+}
+
 data class CaptureSettings(
     val stableDurationMs: Long = 1_000L,
     val minCaptureIntervalMs: Long = 2_000L,
@@ -64,7 +77,7 @@ class AutoCaptureStateMachine(
     }
 
     fun onFrame(metrics: FrameMetrics): CaptureDecision {
-        val thresholds = settings.sensitivity.thresholds()
+        val thresholds = settings.sensitivity.motionThresholds()
 
         return when (state) {
             CaptureState.IDLE -> CaptureDecision(CaptureState.IDLE)
@@ -138,31 +151,12 @@ class AutoCaptureStateMachine(
     }
 
     private fun captureBlockReason(metrics: FrameMetrics): BlockReason {
-        if (settings.darknessCheckEnabled && metrics.averageLuma < DARK_LUMA_THRESHOLD) {
+        if (settings.darknessCheckEnabled && metrics.averageLuma < CaptureQualityThresholds.TOO_DARK_LUMA) {
             return BlockReason.TOO_DARK
         }
-        if (settings.blurCheckEnabled && metrics.edgeScore < BLUR_EDGE_THRESHOLD) {
+        if (settings.blurCheckEnabled && metrics.edgeScore < CaptureQualityThresholds.TOO_BLURRY_EDGE) {
             return BlockReason.TOO_BLURRY
         }
         return BlockReason.NONE
     }
-
-    private data class MotionThresholds(
-        val moveThreshold: Double,
-        val stableThreshold: Double
-    )
-
-    private fun Sensitivity.thresholds(): MotionThresholds {
-        return when (this) {
-            Sensitivity.LOW -> MotionThresholds(moveThreshold = 18.0, stableThreshold = 4.5)
-            Sensitivity.MEDIUM -> MotionThresholds(moveThreshold = 12.0, stableThreshold = 3.5)
-            Sensitivity.HIGH -> MotionThresholds(moveThreshold = 8.0, stableThreshold = 3.0)
-        }
-    }
-
-    companion object {
-        private const val DARK_LUMA_THRESHOLD = 45.0
-        private const val BLUR_EDGE_THRESHOLD = 2.0
-    }
 }
-
