@@ -67,3 +67,14 @@ Users need enough feedback to catch mistakes and remove the latest bad shot, but
 
 Consequence:
 The current UI can show recent saved pages and delete the newest image. Full session recovery after app restart remains a future feature.
+
+## 2026-06-14: One Primary Capture Action
+
+Decision:
+Make the control panel center on a single large start/stop button, with manual capture and delete as secondary actions.
+
+Why:
+The app is used while a phone is fixed above a book, so the main action should be obvious at a glance and easy to hit. Secondary controls should remain available without competing visually.
+
+Consequence:
+Manual capture is disabled during auto capture. Users stop auto capture before deleting the latest page or taking a manual replacement shot.

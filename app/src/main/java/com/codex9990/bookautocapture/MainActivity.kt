@@ -40,7 +40,6 @@ import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -51,6 +50,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -773,123 +773,186 @@ private fun ControlPanel(
                 fontWeight = FontWeight.Bold
             )
 
-        FlowRow(
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            Button(
-                enabled = uiState.hasCameraPermission && uiState.cameraReady && !uiState.isRunning,
-                onClick = onStart
+            PrimaryCaptureButton(
+                uiState = uiState,
+                onStart = onStart,
+                onStop = onStop
+            )
+
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Text("開始")
+                OutlinedButton(
+                    enabled = uiState.hasCameraPermission && uiState.cameraReady && !uiState.isRunning && !uiState.isCapturing,
+                    onClick = onManualCapture
+                ) {
+                    Text("手動撮影")
+                }
+                OutlinedButton(
+                    enabled = uiState.capturedPages.isNotEmpty() && !uiState.isRunning && !uiState.isCapturing,
+                    onClick = onDeleteLastCapture
+                ) {
+                    Text("最後を削除")
+                }
+                OutlinedButton(onClick = onToggleSettings) {
+                    Text(if (showSettings) "詳細設定を閉じる" else "詳細設定")
+                }
             }
-            OutlinedButton(
-                enabled = uiState.isRunning,
-                onClick = onStop
-            ) {
-                Text("停止")
+
+            StatusSummaryPanel(uiState = uiState)
+
+            SwitchRow(
+                label = "撮影音",
+                checked = uiState.soundEnabled,
+                onCheckedChange = onSoundEnabledChange
+            )
+
+            SessionPanel(uiState = uiState)
+
+            Text(
+                text = "端末仕様により、撮影音をOFFにしてもシステムのシャッター音が鳴る場合があります",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.secondary
+            )
+
+            uiState.errorMessage?.let { message ->
+                Surface(
+                    color = Color(0xFFFFE8E1),
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    Text(
+                        text = message,
+                        modifier = Modifier.padding(12.dp),
+                        color = Color(0xFF8A2E16),
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                }
             }
-            OutlinedButton(
-                enabled = uiState.hasCameraPermission && uiState.cameraReady && !uiState.isCapturing,
-                onClick = onManualCapture
-            ) {
-                Text("手動撮影")
-            }
-            OutlinedButton(
-                enabled = uiState.capturedPages.isNotEmpty() && !uiState.isRunning && !uiState.isCapturing,
-                onClick = onDeleteLastCapture
-            ) {
-                Text("最後を削除")
-            }
-            OutlinedButton(onClick = onToggleSettings) {
-                Text(if (showSettings) "詳細設定を閉じる" else "詳細設定")
-            }
-        }
 
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            MetricTile(label = "撮影枚数", value = uiState.captureCount.toString())
-            MetricTile(label = "現在の状態", value = uiState.statusText)
-        }
-
-        SwitchRow(
-            label = "撮影音",
-            checked = uiState.soundEnabled,
-            onCheckedChange = onSoundEnabledChange
-        )
-
-        InfoLine(label = "保存先", value = uiState.saveFolder)
-        InfoLine(label = "最後のファイル", value = uiState.lastFileName)
-
-        CapturedPagesPanel(pages = uiState.capturedPages)
-
-        Text(
-            text = "端末仕様により、撮影音をOFFにしてもシステムのシャッター音が鳴る場合があります",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.secondary
-        )
-
-        uiState.errorMessage?.let { message ->
-            Surface(
-                color = Color(0xFFFFE8E1),
-                shape = RoundedCornerShape(8.dp)
-            ) {
-                Text(
-                    text = message,
-                    modifier = Modifier.padding(12.dp),
-                    color = Color(0xFF8A2E16),
-                    style = MaterialTheme.typography.bodyMedium
+            if (showSettings) {
+                SettingsPanel(
+                    uiState = uiState,
+                    onStableDurationChange = onStableDurationChange,
+                    onMinIntervalChange = onMinIntervalChange,
+                    onSensitivityChange = onSensitivityChange,
+                    onBlurCheckChange = onBlurCheckChange,
+                    onDarknessCheckChange = onDarknessCheckChange
                 )
             }
-        }
-
-        if (showSettings) {
-            SettingsPanel(
-                uiState = uiState,
-                onStableDurationChange = onStableDurationChange,
-                onMinIntervalChange = onMinIntervalChange,
-                onSensitivityChange = onSensitivityChange,
-                onBlurCheckChange = onBlurCheckChange,
-                onDarknessCheckChange = onDarknessCheckChange
-            )
-        }
         }
     }
 }
 
 @Composable
-private fun CapturedPagesPanel(pages: List<CapturedPage>) {
-    if (pages.isEmpty()) return
+private fun PrimaryCaptureButton(
+    uiState: CaptureUiState,
+    onStart: () -> Unit,
+    onStop: () -> Unit
+) {
+    val isStopButton = uiState.isRunning
+    Button(
+        enabled = isStopButton || (uiState.hasCameraPermission && uiState.cameraReady),
+        onClick = if (isStopButton) onStop else onStart,
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(54.dp),
+        shape = RoundedCornerShape(8.dp),
+        colors = if (isStopButton) {
+            ButtonDefaults.buttonColors(
+                containerColor = MaterialTheme.colorScheme.tertiary,
+                contentColor = Color.White
+            )
+        } else {
+            ButtonDefaults.buttonColors()
+        }
+    ) {
+        Text(
+            text = if (isStopButton) "停止" else "開始",
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.SemiBold
+        )
+    }
+}
 
+@Composable
+private fun StatusSummaryPanel(uiState: CaptureUiState) {
     Surface(
         color = MaterialTheme.colorScheme.surfaceVariant,
         shape = RoundedCornerShape(8.dp)
     ) {
-        Column(
-            modifier = Modifier.padding(12.dp),
-            verticalArrangement = Arrangement.spacedBy(6.dp)
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(14.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Text(
-                text = "このセッションの保存",
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.secondary
-            )
-            pages.takeLast(5).forEach { page ->
+            Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = page.fileName,
-                    style = MaterialTheme.typography.bodyMedium,
+                    text = "状態",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.secondary
+                )
+                Text(
+                    text = uiState.statusText,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
             }
-            if (pages.size > 5) {
+            Column(horizontalAlignment = Alignment.End) {
                 Text(
-                    text = "ほか ${pages.size - 5} 件",
-                    style = MaterialTheme.typography.bodySmall,
+                    text = "枚数",
+                    style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.secondary
                 )
+                Text(
+                    text = uiState.captureCount.toString(),
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun SessionPanel(uiState: CaptureUiState) {
+    Surface(
+        color = MaterialTheme.colorScheme.surface,
+        shape = RoundedCornerShape(8.dp),
+        tonalElevation = 1.dp
+    ) {
+        Column(
+            modifier = Modifier.padding(12.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            InfoLine(label = "保存先", value = uiState.saveFolder)
+            InfoLine(label = "最後のファイル", value = uiState.lastFileName)
+
+            if (uiState.capturedPages.isNotEmpty()) {
+                Text(
+                    text = "このセッション",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.secondary
+                )
+                uiState.capturedPages.takeLast(4).forEach { page ->
+                    Text(
+                        text = page.fileName,
+                        style = MaterialTheme.typography.bodyMedium,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+                if (uiState.capturedPages.size > 4) {
+                    Text(
+                        text = "ほか ${uiState.capturedPages.size - 4} 件",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.secondary
+                    )
+                }
             }
         }
     }
@@ -913,31 +976,6 @@ private fun PermissionPanel(onRequestPermission: () -> Unit) {
             Button(onClick = onRequestPermission) {
                 Text("許可する")
             }
-        }
-    }
-}
-
-@Composable
-private fun RowScope.MetricTile(label: String, value: String) {
-    Surface(
-        modifier = Modifier.weight(1f),
-        color = MaterialTheme.colorScheme.surface,
-        shape = RoundedCornerShape(8.dp),
-        tonalElevation = 1.dp
-    ) {
-        Column(modifier = Modifier.padding(12.dp)) {
-            Text(
-                text = label,
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.secondary
-            )
-            Text(
-                text = value,
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.SemiBold,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
         }
     }
 }

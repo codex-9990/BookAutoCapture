@@ -24,6 +24,7 @@ BookAutoCapture is an Android/Kotlin app for fixed-position book capture. The cu
   - `COOLDOWN`
 - Stable-duration and minimum-capture-interval settings
 - Sensitivity setting: low, medium, high
+- Simplified control panel with one primary start/stop action
 - Optional blur and darkness checks
 - Capture-complete sound toggle
 - Notice that system shutter sound may still play depending on device policy

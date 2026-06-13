@@ -12,6 +12,13 @@ This file is the chronological memory of the project. Keep entries short, concre
 - Replaced deprecated `ImageAnalysis.Builder.setTargetResolution` usage with `ResolutionSelector`.
 - Updated README and status docs with the new test steps and known limitation.
 
+### Simple Control Panel
+
+- Reworked the control panel around one large primary start/stop button.
+- Moved state and capture count into a single status summary.
+- Grouped save path, last filename, and recent saved pages into one session section.
+- Disabled manual capture while auto capture is running to reduce accidental double captures.
+
 ### Verification
 
 Passed:
