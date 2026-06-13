@@ -1,6 +1,6 @@
 # Development Status
 
-Last updated: 2026-06-09
+Last updated: 2026-06-14
 
 ## Current Snapshot
 
@@ -12,6 +12,8 @@ BookAutoCapture is an Android/Kotlin app for fixed-position book capture. The cu
 - CameraX `ImageCapture` JPEG saving to MediaStore
 - Session folders under `Pictures/BookAutoCapture/YYYYMMdd_HHmmss/`
 - Sequential filenames such as `page_0001.jpg`
+- In-session saved page list with recent filenames
+- Delete-last-capture action for the current session
 - CameraX `ImageAnalysis` using lightweight luma-frame sampling
 - Auto-capture state machine:
   - `IDLE`
@@ -41,7 +43,7 @@ Run locally from the repository root.
 .\gradlew.bat assembleDebug
 ```
 
-Both commands passed on 2026-06-09.
+Both commands passed on 2026-06-14.
 
 ## Generated APK
 
@@ -57,8 +59,8 @@ Build outputs are intentionally ignored by Git. GitHub Actions can upload a debu
 
 - Real-device behavior has not been fully tuned across multiple Android vendors.
 - Blur and darkness thresholds are simple luma-based heuristics and will need real capture samples.
-- The analyzer still uses `setTargetResolution`, which currently builds but is deprecated.
 - The UI is functional, but it still needs real-device polish on small phones and tablets.
+- The saved page list and delete-last action are in-memory for the current app session only.
 - No OCR, PDF export, page review screen, or session gallery exists yet.
 - No release signing setup exists yet.
 
@@ -79,4 +81,5 @@ Use an actual Android device and verify:
 4. Screen stays awake while auto capture is running.
 5. Saved image orientation is correct in the gallery.
 6. No UI panel overlaps the camera preview while scrolling detailed settings.
-
+7. The saved page list updates after each capture.
+8. `最後を削除` removes the newest saved image after auto capture is stopped.

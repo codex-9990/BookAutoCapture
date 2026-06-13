@@ -2,6 +2,25 @@
 
 This file is the chronological memory of the project. Keep entries short, concrete, and tied to verified behavior.
 
+## 2026-06-14
+
+### Capture Session Polish
+
+- Added an in-session saved page list showing recent filenames.
+- Added `最後を削除` so the latest saved image can be removed after stopping auto capture.
+- Kept the session list lightweight by storing filenames and MediaStore URIs only.
+- Replaced deprecated `ImageAnalysis.Builder.setTargetResolution` usage with `ResolutionSelector`.
+- Updated README and status docs with the new test steps and known limitation.
+
+### Verification
+
+Passed:
+
+```powershell
+.\gradlew.bat testDebugUnitTest
+.\gradlew.bat assembleDebug
+```
+
 ## 2026-06-09
 
 ### Initial Android Project
@@ -57,4 +76,3 @@ Passed:
 - Verified:
 - Follow-up:
 ```
-

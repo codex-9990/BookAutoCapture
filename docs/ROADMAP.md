@@ -5,9 +5,8 @@ This roadmap is intentionally practical. The app should become a dependable capt
 ## Phase 1: Capture Reliability
 
 - Tune page-turn sensitivity on real devices.
-- Replace deprecated analyzer target-resolution API.
 - Add a session review screen.
-- Add delete/retry for the last captured page.
+- Add retry flow that deletes the latest page and immediately starts a manual recapture.
 - Add clearer camera permission recovery UI.
 - Add visible warning when storage save fails.
 - Add tablet layout checks.
@@ -16,6 +15,7 @@ This roadmap is intentionally practical. The app should become a dependable capt
 
 - Add session list.
 - Add page thumbnail review without keeping unnecessary app-private image caches.
+- Persist session metadata so the app can recover recent sessions after restart.
 - Add export of a simple session manifest:
 
 ```json
@@ -53,4 +53,3 @@ This roadmap is intentionally practical. The app should become a dependable capt
 - Root or ADB workflows
 - Large persistent app caches
 - Analytics SDKs
-

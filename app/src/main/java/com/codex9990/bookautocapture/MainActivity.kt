@@ -8,6 +8,7 @@ import android.content.pm.PackageManager
 import android.content.res.Configuration
 import android.media.AudioManager
 import android.media.ToneGenerator
+import android.net.Uri
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
@@ -27,6 +28,8 @@ import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.ImageCapture
 import androidx.camera.core.ImageCaptureException
 import androidx.camera.core.Preview
+import androidx.camera.core.resolutionselector.ResolutionSelector
+import androidx.camera.core.resolutionselector.ResolutionStrategy
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
 import androidx.compose.foundation.background
@@ -134,6 +137,7 @@ class MainActivity : ComponentActivity() {
                     onStart = ::startAutoCapture,
                     onStop = ::stopAutoCapture,
                     onManualCapture = ::captureSinglePage,
+                    onDeleteLastCapture = ::deleteLastCapture,
                     onSoundEnabledChange = { updateSettings(soundEnabled = it) },
                     onStableDurationChange = { updateSettings(stableDurationMs = it) },
                     onMinIntervalChange = { updateSettings(minCaptureIntervalMs = it) },
@@ -251,7 +255,16 @@ class MainActivity : ComponentActivity() {
                     imageCapture = capture
 
                     val analysis = ImageAnalysis.Builder()
-                        .setTargetResolution(Size(320, 240))
+                        .setResolutionSelector(
+                            ResolutionSelector.Builder()
+                                .setResolutionStrategy(
+                                    ResolutionStrategy(
+                                        Size(320, 240),
+                                        ResolutionStrategy.FALLBACK_RULE_CLOSEST_HIGHER_THEN_LOWER
+                                    )
+                                )
+                                .build()
+                        )
                         .setTargetRotation(rotation)
                         .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
                         .build()
@@ -325,6 +338,7 @@ class MainActivity : ComponentActivity() {
             sessionFolder = sessionFolder,
             saveFolder = "$BASE_SAVE_FOLDER/$sessionFolder",
             lastFileName = "-",
+            capturedPages = emptyList(),
             statusText = "ページめくり待ち",
             errorMessage = null
         )
@@ -417,6 +431,10 @@ class MainActivity : ComponentActivity() {
                             isCapturing = false,
                             captureCount = nextPageNumber,
                             lastFileName = fileName,
+                            capturedPages = uiState.capturedPages + CapturedPage(
+                                fileName = fileName,
+                                uri = outputFileResults.savedUri
+                            ),
                             statusText = "撮影完了",
                             errorMessage = null
                         )
@@ -436,6 +454,43 @@ class MainActivity : ComponentActivity() {
                     }
                 }
             }
+        )
+    }
+
+    private fun deleteLastCapture() {
+        if (uiState.isRunning || uiState.isCapturing) return
+
+        val page = uiState.capturedPages.lastOrNull()
+        if (page == null) {
+            uiState = uiState.copy(errorMessage = "削除できる撮影画像がありません")
+            return
+        }
+
+        val uri = page.uri
+        if (uri == null) {
+            uiState = uiState.copy(errorMessage = "保存先URIが取得できなかったため削除できません")
+            return
+        }
+
+        val deleted = runCatching {
+            contentResolver.delete(uri, null, null)
+        }.getOrElse { error ->
+            uiState = uiState.copy(errorMessage = "削除に失敗しました: ${error.message.orEmpty()}")
+            return
+        }
+
+        if (deleted <= 0) {
+            uiState = uiState.copy(errorMessage = "削除対象の画像が見つかりませんでした")
+            return
+        }
+
+        val remainingPages = uiState.capturedPages.dropLast(1)
+        uiState = uiState.copy(
+            capturedPages = remainingPages,
+            captureCount = remainingPages.size,
+            lastFileName = remainingPages.lastOrNull()?.fileName ?: "-",
+            statusText = "最後の撮影を削除",
+            errorMessage = null
         )
     }
 
@@ -547,7 +602,13 @@ private data class CaptureUiState(
     val darknessCheckEnabled: Boolean = true,
     val sessionFolder: String = "",
     val saveFolder: String = "Pictures/BookAutoCapture",
-    val lastFileName: String = "-"
+    val lastFileName: String = "-",
+    val capturedPages: List<CapturedPage> = emptyList()
+)
+
+private data class CapturedPage(
+    val fileName: String,
+    val uri: Uri?
 )
 
 @Composable
@@ -576,6 +637,7 @@ private fun BookAutoCaptureScreen(
     onStart: () -> Unit,
     onStop: () -> Unit,
     onManualCapture: () -> Unit,
+    onDeleteLastCapture: () -> Unit,
     onSoundEnabledChange: (Boolean) -> Unit,
     onStableDurationChange: (Long) -> Unit,
     onMinIntervalChange: (Long) -> Unit,
@@ -608,6 +670,7 @@ private fun BookAutoCaptureScreen(
                     onStart = onStart,
                     onStop = onStop,
                     onManualCapture = onManualCapture,
+                    onDeleteLastCapture = onDeleteLastCapture,
                     onSoundEnabledChange = onSoundEnabledChange,
                     onStableDurationChange = onStableDurationChange,
                     onMinIntervalChange = onMinIntervalChange,
@@ -636,6 +699,7 @@ private fun BookAutoCaptureScreen(
                     onStart = onStart,
                     onStop = onStop,
                     onManualCapture = onManualCapture,
+                    onDeleteLastCapture = onDeleteLastCapture,
                     onSoundEnabledChange = onSoundEnabledChange,
                     onStableDurationChange = onStableDurationChange,
                     onMinIntervalChange = onMinIntervalChange,
@@ -683,6 +747,7 @@ private fun ControlPanel(
     onStart: () -> Unit,
     onStop: () -> Unit,
     onManualCapture: () -> Unit,
+    onDeleteLastCapture: () -> Unit,
     onSoundEnabledChange: (Boolean) -> Unit,
     onStableDurationChange: (Long) -> Unit,
     onMinIntervalChange: (Long) -> Unit,
@@ -730,6 +795,12 @@ private fun ControlPanel(
             ) {
                 Text("手動撮影")
             }
+            OutlinedButton(
+                enabled = uiState.capturedPages.isNotEmpty() && !uiState.isRunning && !uiState.isCapturing,
+                onClick = onDeleteLastCapture
+            ) {
+                Text("最後を削除")
+            }
             OutlinedButton(onClick = onToggleSettings) {
                 Text(if (showSettings) "詳細設定を閉じる" else "詳細設定")
             }
@@ -751,6 +822,8 @@ private fun ControlPanel(
 
         InfoLine(label = "保存先", value = uiState.saveFolder)
         InfoLine(label = "最後のファイル", value = uiState.lastFileName)
+
+        CapturedPagesPanel(pages = uiState.capturedPages)
 
         Text(
             text = "端末仕様により、撮影音をOFFにしてもシステムのシャッター音が鳴る場合があります",
@@ -782,6 +855,42 @@ private fun ControlPanel(
                 onDarknessCheckChange = onDarknessCheckChange
             )
         }
+        }
+    }
+}
+
+@Composable
+private fun CapturedPagesPanel(pages: List<CapturedPage>) {
+    if (pages.isEmpty()) return
+
+    Surface(
+        color = MaterialTheme.colorScheme.surfaceVariant,
+        shape = RoundedCornerShape(8.dp)
+    ) {
+        Column(
+            modifier = Modifier.padding(12.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            Text(
+                text = "このセッションの保存",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.secondary
+            )
+            pages.takeLast(5).forEach { page ->
+                Text(
+                    text = page.fileName,
+                    style = MaterialTheme.typography.bodyMedium,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+            if (pages.size > 5) {
+                Text(
+                    text = "ほか ${pages.size - 5} 件",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.secondary
+                )
+            }
         }
     }
 }

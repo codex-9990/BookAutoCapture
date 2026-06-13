@@ -57,3 +57,13 @@ Repository docs are useful as long-term project memory. GitHub Actions can verif
 Consequence:
 Add and maintain `docs/STATUS.md`, `docs/DEVLOG.md`, `docs/ROADMAP.md`, and `docs/DECISIONS.md`.
 
+## 2026-06-14: Lightweight Session History
+
+Decision:
+Track only filenames and MediaStore URIs for pages captured during the current app session.
+
+Why:
+Users need enough feedback to catch mistakes and remove the latest bad shot, but the app should not keep thumbnails or duplicate image caches.
+
+Consequence:
+The current UI can show recent saved pages and delete the newest image. Full session recovery after app restart remains a future feature.
