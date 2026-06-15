@@ -89,3 +89,14 @@ The most useful next polish is preventing bad captures before they happen. Reusi
 
 Consequence:
 The app now gives simple `良好` / `注意` / `撮影しません` feedback. Thresholds still need real-device tuning before treating the result as a final document-quality score.
+
+## 2026-06-15: Landscape Photo Default
+
+Decision:
+Default saved photos to landscape orientation, with portrait available from the control panel.
+
+Why:
+An open book is usually wider than it is tall. Landscape output better matches the main capture case and reduces rotation work before OCR.
+
+Consequence:
+The app separates the saved photo orientation from the current screen layout. Real devices should still be checked for EXIF orientation behavior in gallery and OCR tools.

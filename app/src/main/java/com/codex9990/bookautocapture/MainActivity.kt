@@ -150,7 +150,8 @@ class MainActivity : ComponentActivity() {
                     onMinIntervalChange = { updateSettings(minCaptureIntervalMs = it) },
                     onSensitivityChange = { updateSettings(sensitivity = it) },
                     onBlurCheckChange = { updateSettings(blurCheckEnabled = it) },
-                    onDarknessCheckChange = { updateSettings(darknessCheckEnabled = it) }
+                    onDarknessCheckChange = { updateSettings(darknessCheckEnabled = it) },
+                    onPhotoOrientationChange = { updateSettings(photoOrientation = it) }
                 )
             }
         }
@@ -187,6 +188,13 @@ class MainActivity : ComponentActivity() {
         val sensitivity = runCatching {
             Sensitivity.valueOf(sensitivityName ?: Sensitivity.MEDIUM.name)
         }.getOrDefault(Sensitivity.MEDIUM)
+        val photoOrientationName = preferences.getString(
+            KEY_PHOTO_ORIENTATION,
+            PhotoOrientation.LANDSCAPE.name
+        )
+        val photoOrientation = runCatching {
+            PhotoOrientation.valueOf(photoOrientationName ?: PhotoOrientation.LANDSCAPE.name)
+        }.getOrDefault(PhotoOrientation.LANDSCAPE)
 
         return CaptureUiState(
             hasCameraPermission = hasCameraPermission(),
@@ -196,6 +204,7 @@ class MainActivity : ComponentActivity() {
             sensitivity = sensitivity,
             blurCheckEnabled = preferences.getBoolean(KEY_BLUR_CHECK_ENABLED, true),
             darknessCheckEnabled = preferences.getBoolean(KEY_DARKNESS_CHECK_ENABLED, true),
+            photoOrientation = photoOrientation,
             statusText = if (hasCameraPermission()) "待機中" else "カメラ権限が必要です"
         )
     }
@@ -206,7 +215,8 @@ class MainActivity : ComponentActivity() {
         minCaptureIntervalMs: Long = uiState.minCaptureIntervalMs,
         sensitivity: Sensitivity = uiState.sensitivity,
         blurCheckEnabled: Boolean = uiState.blurCheckEnabled,
-        darknessCheckEnabled: Boolean = uiState.darknessCheckEnabled
+        darknessCheckEnabled: Boolean = uiState.darknessCheckEnabled,
+        photoOrientation: PhotoOrientation = uiState.photoOrientation
     ) {
         uiState = uiState.copy(
             soundEnabled = soundEnabled,
@@ -214,9 +224,11 @@ class MainActivity : ComponentActivity() {
             minCaptureIntervalMs = minCaptureIntervalMs.coerceIn(1_000L, 5_000L),
             sensitivity = sensitivity,
             blurCheckEnabled = blurCheckEnabled,
-            darknessCheckEnabled = darknessCheckEnabled
+            darknessCheckEnabled = darknessCheckEnabled,
+            photoOrientation = photoOrientation
         )
         stateMachine.settings = uiState.toCaptureSettings()
+        updateTargetRotation()
 
         getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
             .edit()
@@ -226,6 +238,7 @@ class MainActivity : ComponentActivity() {
             .putString(KEY_SENSITIVITY, uiState.sensitivity.name)
             .putBoolean(KEY_BLUR_CHECK_ENABLED, uiState.blurCheckEnabled)
             .putBoolean(KEY_DARKNESS_CHECK_ENABLED, uiState.darknessCheckEnabled)
+            .putString(KEY_PHOTO_ORIENTATION, uiState.photoOrientation.name)
             .apply()
     }
 
@@ -257,7 +270,7 @@ class MainActivity : ComponentActivity() {
                     val capture = ImageCapture.Builder()
                         .setCaptureMode(ImageCapture.CAPTURE_MODE_MAXIMIZE_QUALITY)
                         .setJpegQuality(100)
-                        .setTargetRotation(rotation)
+                        .setTargetRotation(captureTargetRotation())
                         .build()
                     imageCapture = capture
 
@@ -425,7 +438,7 @@ class MainActivity : ComponentActivity() {
         val nextPageNumber = uiState.captureCount + 1
         val fileName = String.format(Locale.US, "page_%04d.jpg", nextPageNumber)
         val outputOptions = createOutputOptions(fileName, uiState.sessionFolder)
-        capture.targetRotation = currentRotation()
+        capture.targetRotation = captureTargetRotation()
 
         uiState = uiState.copy(isCapturing = true, statusText = "撮影中", errorMessage = null)
         capture.takePicture(
@@ -550,8 +563,20 @@ class MainActivity : ComponentActivity() {
         return previewView.display?.rotation ?: Surface.ROTATION_0
     }
 
+    private fun captureTargetRotation(): Int {
+        val rotation = currentRotation()
+        return when (uiState.photoOrientation) {
+            PhotoOrientation.LANDSCAPE -> {
+                if (rotation.isLandscapeRotation()) rotation else Surface.ROTATION_90
+            }
+            PhotoOrientation.PORTRAIT -> {
+                if (rotation.isPortraitRotation()) rotation else Surface.ROTATION_0
+            }
+        }
+    }
+
     private fun updateTargetRotation() {
-        imageCapture?.targetRotation = currentRotation()
+        imageCapture?.targetRotation = captureTargetRotation()
     }
 
     private fun setScreenAwake(keepAwake: Boolean) {
@@ -605,6 +630,7 @@ class MainActivity : ComponentActivity() {
         private const val KEY_SENSITIVITY = "sensitivity"
         private const val KEY_BLUR_CHECK_ENABLED = "blur_check_enabled"
         private const val KEY_DARKNESS_CHECK_ENABLED = "darkness_check_enabled"
+        private const val KEY_PHOTO_ORIENTATION = "photo_orientation"
         private const val BASE_SAVE_FOLDER = "Pictures/BookAutoCapture"
     }
 }
@@ -623,6 +649,7 @@ private data class CaptureUiState(
     val sensitivity: Sensitivity = Sensitivity.MEDIUM,
     val blurCheckEnabled: Boolean = true,
     val darknessCheckEnabled: Boolean = true,
+    val photoOrientation: PhotoOrientation = PhotoOrientation.LANDSCAPE,
     val sessionFolder: String = "",
     val saveFolder: String = "Pictures/BookAutoCapture",
     val lastFileName: String = "-",
@@ -634,6 +661,11 @@ private data class CapturedPage(
     val fileName: String,
     val uri: Uri?
 )
+
+private enum class PhotoOrientation {
+    LANDSCAPE,
+    PORTRAIT
+}
 
 @Composable
 private fun BookAutoCaptureTheme(content: @Composable () -> Unit) {
@@ -667,7 +699,8 @@ private fun BookAutoCaptureScreen(
     onMinIntervalChange: (Long) -> Unit,
     onSensitivityChange: (Sensitivity) -> Unit,
     onBlurCheckChange: (Boolean) -> Unit,
-    onDarknessCheckChange: (Boolean) -> Unit
+    onDarknessCheckChange: (Boolean) -> Unit,
+    onPhotoOrientationChange: (PhotoOrientation) -> Unit
 ) {
     var showSettings by androidx.compose.runtime.remember { mutableStateOf(false) }
     val configuration = LocalConfiguration.current
@@ -701,6 +734,7 @@ private fun BookAutoCaptureScreen(
                     onSensitivityChange = onSensitivityChange,
                     onBlurCheckChange = onBlurCheckChange,
                     onDarknessCheckChange = onDarknessCheckChange,
+                    onPhotoOrientationChange = onPhotoOrientationChange,
                     modifier = Modifier
                         .weight(0.9f)
                         .fillMaxHeight()
@@ -730,6 +764,7 @@ private fun BookAutoCaptureScreen(
                     onSensitivityChange = onSensitivityChange,
                     onBlurCheckChange = onBlurCheckChange,
                     onDarknessCheckChange = onDarknessCheckChange,
+                    onPhotoOrientationChange = onPhotoOrientationChange,
                     modifier = Modifier
                         .fillMaxWidth()
                         .heightIn(max = 380.dp)
@@ -778,6 +813,7 @@ private fun ControlPanel(
     onSensitivityChange: (Sensitivity) -> Unit,
     onBlurCheckChange: (Boolean) -> Unit,
     onDarknessCheckChange: (Boolean) -> Unit,
+    onPhotoOrientationChange: (PhotoOrientation) -> Unit,
     modifier: Modifier = Modifier
 ) {
     Surface(
@@ -823,6 +859,11 @@ private fun ControlPanel(
                     Text(if (showSettings) "詳細設定を閉じる" else "詳細設定")
                 }
             }
+
+            PhotoOrientationSelector(
+                photoOrientation = uiState.photoOrientation,
+                onPhotoOrientationChange = onPhotoOrientationChange
+            )
 
             StatusSummaryPanel(uiState = uiState)
 
@@ -939,6 +980,46 @@ private fun StatusSummaryPanel(uiState: CaptureUiState) {
                     style = MaterialTheme.typography.headlineSmall,
                     fontWeight = FontWeight.Bold
                 )
+            }
+        }
+    }
+}
+
+@Composable
+@OptIn(ExperimentalLayoutApi::class)
+private fun PhotoOrientationSelector(
+    photoOrientation: PhotoOrientation,
+    onPhotoOrientationChange: (PhotoOrientation) -> Unit
+) {
+    Surface(
+        color = MaterialTheme.colorScheme.surface,
+        shape = RoundedCornerShape(8.dp),
+        tonalElevation = 1.dp
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(12.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = "写真の向き",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.secondary
+            )
+            FlowRow(
+                modifier = Modifier.weight(1f),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                PhotoOrientation.entries.forEach { orientation ->
+                    FilterChip(
+                        selected = photoOrientation == orientation,
+                        onClick = { onPhotoOrientationChange(orientation) },
+                        label = { Text(orientation.displayName()) }
+                    )
+                }
             }
         }
     }
@@ -1277,6 +1358,13 @@ private fun QualityAssessment.adviceText(): String {
     }
 }
 
+private fun PhotoOrientation.displayName(): String {
+    return when (this) {
+        PhotoOrientation.LANDSCAPE -> "横長"
+        PhotoOrientation.PORTRAIT -> "縦長"
+    }
+}
+
 @Composable
 private fun Sensitivity.displayName(): String {
     return when (this) {
@@ -1284,6 +1372,14 @@ private fun Sensitivity.displayName(): String {
         Sensitivity.MEDIUM -> "中"
         Sensitivity.HIGH -> "高"
     }
+}
+
+private fun Int.isLandscapeRotation(): Boolean {
+    return this == Surface.ROTATION_90 || this == Surface.ROTATION_270
+}
+
+private fun Int.isPortraitRotation(): Boolean {
+    return this == Surface.ROTATION_0 || this == Surface.ROTATION_180
 }
 
 private object SliderDefaultsCompat {

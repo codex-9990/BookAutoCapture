@@ -2,6 +2,15 @@
 
 This file is the chronological memory of the project. Keep entries short, concrete, and tied to verified behavior.
 
+## 2026-06-15
+
+### Photo Orientation
+
+- Added a visible `写真の向き` selector to the control panel.
+- Made landscape the default save orientation for open books.
+- Kept portrait available as a one-tap option.
+- Persisted the selected photo orientation in app preferences.
+
 ## 2026-06-14
 
 ### Capture Session Polish

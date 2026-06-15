@@ -1,6 +1,6 @@
 # Development Status
 
-Last updated: 2026-06-14
+Last updated: 2026-06-15
 
 ## Current Snapshot
 
@@ -25,6 +25,7 @@ BookAutoCapture is an Android/Kotlin app for fixed-position book capture. The cu
 - Stable-duration and minimum-capture-interval settings
 - Sensitivity setting: low, medium, high
 - Simplified control panel with one primary start/stop action
+- Photo orientation selector with landscape as the default and portrait as an option
 - Live quality panel for brightness, blur, and stability before capture
 - Optional blur and darkness checks
 - Capture-complete sound toggle
@@ -82,7 +83,9 @@ Use an actual Android device and verify:
 3. Auto capture after a page turn.
 4. Screen stays awake while auto capture is running.
 5. Saved image orientation is correct in the gallery.
-6. Quality panel changes between good, caution, and blocked in realistic lighting and motion.
-7. No UI panel overlaps the camera preview while scrolling detailed settings.
-8. The saved page list updates after each capture.
-9. `最後を削除` removes the newest saved image after auto capture is stopped.
+6. Landscape photo orientation is the default.
+7. Portrait photo orientation can be selected and saved correctly.
+8. Quality panel changes between good, caution, and blocked in realistic lighting and motion.
+9. No UI panel overlaps the camera preview while scrolling detailed settings.
+10. The saved page list updates after each capture.
+11. `最後を削除` removes the newest saved image after auto capture is stopped.
