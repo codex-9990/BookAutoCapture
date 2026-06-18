@@ -111,3 +111,14 @@ Book capture can be interrupted by app closure, battery issues, or a user break.
 
 Consequence:
 The next capture continues from the restored page count. If files are deleted or edited outside the app, the stored MediaStore URI list may need future reconciliation.
+
+## 2026-06-18: Capture-First Control Panel
+
+Decision:
+Put current mode, next filename, saved count, primary action, and quality feedback before secondary controls.
+
+Why:
+The user operates the app while handling a physical book, so the screen should answer only the immediate questions first: what session am I in, what happens if I tap the big button, and will the next photo be acceptable.
+
+Consequence:
+Secondary actions remain available, but manual capture, delete-last, new-book, and settings are grouped together below the main capture flow.

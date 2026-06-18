@@ -28,6 +28,8 @@ BookAutoCapture is an Android/Kotlin app for fixed-position book capture. The cu
 - Stable-duration and minimum-capture-interval settings
 - Sensitivity setting: low, medium, high
 - Simplified control panel with one primary start/pause/resume action
+- Capture overview panel showing current mode, status, saved count, next filename, and photo orientation
+- Secondary actions grouped under one `操作` section
 - Photo orientation selector with landscape as the default and portrait as an option
 - Live quality panel for brightness, blur, and stability before capture
 - Optional blur and darkness checks
@@ -91,7 +93,8 @@ Use an actual Android device and verify:
 8. Quality panel changes between good, caution, and blocked in realistic lighting and motion.
 9. No UI panel overlaps the camera preview while scrolling detailed settings.
 10. The saved page list updates after each capture.
-11. `中断` pauses auto capture and shows `再開`.
-12. After closing and reopening the app, `再開` continues in the same folder with the next page number.
-13. `新規開始` starts another session from `page_0001.jpg`.
+11. `中断する` pauses auto capture and shows `続きから撮る`.
+12. After closing and reopening the app, `続きから撮る` continues in the same folder with the next page number.
+13. `新しい本` starts another session from `page_0001.jpg`.
 14. `最後を削除` removes the newest saved image after auto capture is paused.
+15. The first controls visible in the panel are overview, primary action, and quality feedback.

@@ -750,6 +750,18 @@ private data class CapturedPage(
 private val CaptureUiState.hasSavedSession: Boolean
     get() = sessionFolder.isNotBlank()
 
+private val CaptureUiState.nextFileName: String
+    get() = String.format(Locale.US, "page_%04d.jpg", captureCount + 1)
+
+private fun CaptureUiState.overviewTitle(): String {
+    return when {
+        isCapturing -> "保存中"
+        isRunning -> "撮影中"
+        hasSavedSession -> "前回の続き"
+        else -> "新しい撮影"
+    }
+}
+
 private enum class PhotoOrientation {
     LANDSCAPE,
     PORTRAIT
@@ -920,10 +932,12 @@ private fun ControlPanel(
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             Text(
-                text = "BookAutoCapture",
+                text = "本の連続撮影",
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.Bold
             )
+
+            CaptureOverviewPanel(uiState = uiState)
 
             PrimaryCaptureButton(
                 uiState = uiState,
@@ -931,43 +945,21 @@ private fun ControlPanel(
                 onPause = onPause
             )
 
-            FlowRow(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                OutlinedButton(
-                    enabled = uiState.hasCameraPermission && uiState.cameraReady && !uiState.isRunning && !uiState.isCapturing,
-                    onClick = onManualCapture
-                ) {
-                    Text("手動撮影")
-                }
-                OutlinedButton(
-                    enabled = uiState.capturedPages.isNotEmpty() && !uiState.isRunning && !uiState.isCapturing,
-                    onClick = onDeleteLastCapture
-                ) {
-                    Text("最後を削除")
-                }
-                if (uiState.hasSavedSession && !uiState.isRunning && !uiState.isCapturing) {
-                    OutlinedButton(
-                        enabled = uiState.hasCameraPermission && uiState.cameraReady,
-                        onClick = onStartNewSession
-                    ) {
-                        Text("新規開始")
-                    }
-                }
-                OutlinedButton(onClick = onToggleSettings) {
-                    Text(if (showSettings) "詳細設定を閉じる" else "詳細設定")
-                }
-            }
+            QualityPanel(assessment = uiState.qualityAssessment)
 
             PhotoOrientationSelector(
                 photoOrientation = uiState.photoOrientation,
                 onPhotoOrientationChange = onPhotoOrientationChange
             )
 
-            StatusSummaryPanel(uiState = uiState)
-
-            QualityPanel(assessment = uiState.qualityAssessment)
+            QuickActionsPanel(
+                uiState = uiState,
+                showSettings = showSettings,
+                onToggleSettings = onToggleSettings,
+                onManualCapture = onManualCapture,
+                onDeleteLastCapture = onDeleteLastCapture,
+                onStartNewSession = onStartNewSession
+            )
 
             SwitchRow(
                 label = "撮影音",
@@ -976,12 +968,6 @@ private fun ControlPanel(
             )
 
             SessionPanel(uiState = uiState)
-
-            Text(
-                text = "端末仕様により、撮影音をOFFにしてもシステムのシャッター音が鳴る場合があります",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.secondary
-            )
 
             uiState.errorMessage?.let { message ->
                 Surface(
@@ -1023,7 +1009,7 @@ private fun PrimaryCaptureButton(
         onClick = if (isStopButton) onPause else onStart,
         modifier = Modifier
             .fillMaxWidth()
-            .height(54.dp),
+            .height(62.dp),
         shape = RoundedCornerShape(8.dp),
         colors = if (isStopButton) {
             ButtonDefaults.buttonColors(
@@ -1036,9 +1022,9 @@ private fun PrimaryCaptureButton(
     ) {
         Text(
             text = when {
-                isStopButton -> "中断"
-                uiState.hasSavedSession -> "再開"
-                else -> "開始"
+                isStopButton -> "中断する"
+                uiState.hasSavedSession -> "続きから撮る"
+                else -> "撮影を開始"
             },
             style = MaterialTheme.typography.titleMedium,
             fontWeight = FontWeight.SemiBold
@@ -1047,43 +1033,149 @@ private fun PrimaryCaptureButton(
 }
 
 @Composable
-private fun StatusSummaryPanel(uiState: CaptureUiState) {
+private fun CaptureOverviewPanel(uiState: CaptureUiState) {
     Surface(
         color = MaterialTheme.colorScheme.surfaceVariant,
         shape = RoundedCornerShape(8.dp)
     ) {
-        Row(
+        Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(14.dp),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-            verticalAlignment = Alignment.CenterVertically
+            verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = "状態",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.secondary
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = uiState.overviewTitle(),
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    Text(
+                        text = uiState.statusText,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.secondary,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+                Column(horizontalAlignment = Alignment.End) {
+                    Text(
+                        text = "撮影済み",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.secondary
+                    )
+                    Text(
+                        text = "${uiState.captureCount}枚",
+                        style = MaterialTheme.typography.headlineSmall,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                OverviewItem(
+                    label = "次に保存",
+                    value = uiState.nextFileName,
+                    modifier = Modifier.weight(1f)
                 )
-                Text(
-                    text = uiState.statusText,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
+                OverviewItem(
+                    label = "写真",
+                    value = uiState.photoOrientation.displayName(),
+                    modifier = Modifier.weight(0.65f)
                 )
             }
-            Column(horizontalAlignment = Alignment.End) {
-                Text(
-                    text = "枚数",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.secondary
-                )
-                Text(
-                    text = uiState.captureCount.toString(),
-                    style = MaterialTheme.typography.headlineSmall,
-                    fontWeight = FontWeight.Bold
-                )
+        }
+    }
+}
+
+@Composable
+private fun OverviewItem(
+    label: String,
+    value: String,
+    modifier: Modifier = Modifier
+) {
+    Column(modifier = modifier) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.secondary,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
+        Text(
+            text = value,
+            style = MaterialTheme.typography.bodyLarge,
+            fontWeight = FontWeight.SemiBold,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
+    }
+}
+
+@Composable
+@OptIn(ExperimentalLayoutApi::class)
+private fun QuickActionsPanel(
+    uiState: CaptureUiState,
+    showSettings: Boolean,
+    onToggleSettings: () -> Unit,
+    onManualCapture: () -> Unit,
+    onDeleteLastCapture: () -> Unit,
+    onStartNewSession: () -> Unit
+) {
+    Surface(
+        color = MaterialTheme.colorScheme.surface,
+        shape = RoundedCornerShape(8.dp),
+        tonalElevation = 1.dp
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(12.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            Text(
+                text = "操作",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.secondary
+            )
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                OutlinedButton(
+                    enabled = uiState.hasCameraPermission && uiState.cameraReady && !uiState.isRunning && !uiState.isCapturing,
+                    onClick = onManualCapture
+                ) {
+                    Text("1枚だけ撮る")
+                }
+                OutlinedButton(
+                    enabled = uiState.capturedPages.isNotEmpty() && !uiState.isRunning && !uiState.isCapturing,
+                    onClick = onDeleteLastCapture
+                ) {
+                    Text("最後を削除")
+                }
+                if (uiState.hasSavedSession && !uiState.isRunning && !uiState.isCapturing) {
+                    OutlinedButton(
+                        enabled = uiState.hasCameraPermission && uiState.cameraReady,
+                        onClick = onStartNewSession
+                    ) {
+                        Text("新しい本")
+                    }
+                }
+                OutlinedButton(onClick = onToggleSettings) {
+                    Text(if (showSettings) "設定を閉じる" else "設定")
+                }
             }
         }
     }
@@ -1375,6 +1467,12 @@ private fun SettingsPanel(
                 label = "暗さ判定",
                 checked = uiState.darknessCheckEnabled,
                 onCheckedChange = onDarknessCheckChange
+            )
+
+            Text(
+                text = "撮影音をOFFにしても端末側のシャッター音が鳴る場合があります",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.secondary
             )
         }
     }

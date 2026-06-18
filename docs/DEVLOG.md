@@ -7,10 +7,17 @@ This file is the chronological memory of the project. Keep entries short, concre
 ### Resumable Capture Sessions
 
 - Changed the running primary action from stop to `中断`.
-- Added `再開` behavior so a paused session continues in the same folder.
+- Added resume behavior so a paused session continues in the same folder.
 - Persisted the current session folder and captured page list in app preferences.
 - Restored the captured page count, last filename, and next page number after app restart.
-- Added `新規開始` for beginning another book without deleting old captured images.
+- Added `新しい本` for beginning another book without deleting old captured images.
+
+### Capture UI Simplification
+
+- Reordered the control panel around current mode, primary action, next filename, and quality feedback.
+- Renamed the primary actions to `撮影を開始`, `中断する`, and `続きから撮る`.
+- Grouped manual capture, delete-last, new-book, and settings actions under one `操作` section.
+- Moved the shutter-sound notice into detailed settings to reduce visual noise during capture.
 
 ## 2026-06-15
 
