@@ -66,7 +66,7 @@ Why:
 Users need enough feedback to catch mistakes and remove the latest bad shot, but the app should not keep thumbnails or duplicate image caches.
 
 Consequence:
-The current UI can show recent saved pages and delete the newest image. Full session recovery after app restart remains a future feature.
+The UI can show recent saved pages, delete the newest image, and recover the current session after app restart. External file changes may still make the stored list stale.
 
 ## 2026-06-14: One Primary Capture Action
 
@@ -100,3 +100,14 @@ An open book is usually wider than it is tall. Landscape output better matches t
 
 Consequence:
 The app separates the saved photo orientation from the current screen layout. Real devices should still be checked for EXIF orientation behavior in gallery and OCR tools.
+
+## 2026-06-18: Persist Resumable Session Metadata
+
+Decision:
+Persist the current capture session folder and captured page metadata in app preferences.
+
+Why:
+Book capture can be interrupted by app closure, battery issues, or a user break. Saving only lightweight metadata lets the app continue from the same folder without copying images or storing book content in GitHub or app-private caches.
+
+Consequence:
+The next capture continues from the restored page count. If files are deleted or edited outside the app, the stored MediaStore URI list may need future reconciliation.

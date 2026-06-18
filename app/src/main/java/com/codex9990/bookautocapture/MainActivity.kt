@@ -94,6 +94,8 @@ import java.time.format.DateTimeFormatter
 import java.util.Locale
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
+import org.json.JSONArray
+import org.json.JSONObject
 
 class MainActivity : ComponentActivity() {
     private lateinit var previewView: PreviewView
@@ -142,7 +144,8 @@ class MainActivity : ComponentActivity() {
                     previewView = previewView,
                     onRequestPermission = ::requestCameraPermission,
                     onStart = ::startAutoCapture,
-                    onStop = ::stopAutoCapture,
+                    onPause = ::pauseAutoCapture,
+                    onStartNewSession = ::startNewAutoCapture,
                     onManualCapture = ::captureSinglePage,
                     onDeleteLastCapture = ::deleteLastCapture,
                     onSoundEnabledChange = { updateSettings(soundEnabled = it) },
@@ -166,7 +169,7 @@ class MainActivity : ComponentActivity() {
     override fun onStop() {
         super.onStop()
         if (uiState.isRunning) {
-            stopAutoCapture()
+            pauseAutoCapture()
         }
     }
 
@@ -195,9 +198,16 @@ class MainActivity : ComponentActivity() {
         val photoOrientation = runCatching {
             PhotoOrientation.valueOf(photoOrientationName ?: PhotoOrientation.LANDSCAPE.name)
         }.getOrDefault(PhotoOrientation.LANDSCAPE)
+        val restoredSessionFolder = preferences.getString(KEY_SESSION_FOLDER, "").orEmpty()
+        val restoredPages = if (restoredSessionFolder.isBlank()) {
+            emptyList()
+        } else {
+            decodeCapturedPages(preferences.getString(KEY_CAPTURED_PAGES, null))
+        }
+        val hasPermission = hasCameraPermission()
 
         return CaptureUiState(
-            hasCameraPermission = hasCameraPermission(),
+            hasCameraPermission = hasPermission,
             soundEnabled = preferences.getBoolean(KEY_SOUND_ENABLED, true),
             stableDurationMs = preferences.getLong(KEY_STABLE_DURATION_MS, 1_000L),
             minCaptureIntervalMs = preferences.getLong(KEY_MIN_CAPTURE_INTERVAL_MS, 2_000L),
@@ -205,7 +215,20 @@ class MainActivity : ComponentActivity() {
             blurCheckEnabled = preferences.getBoolean(KEY_BLUR_CHECK_ENABLED, true),
             darknessCheckEnabled = preferences.getBoolean(KEY_DARKNESS_CHECK_ENABLED, true),
             photoOrientation = photoOrientation,
-            statusText = if (hasCameraPermission()) "待機中" else "カメラ権限が必要です"
+            captureCount = restoredPages.size,
+            sessionFolder = restoredSessionFolder,
+            saveFolder = if (restoredSessionFolder.isBlank()) {
+                BASE_SAVE_FOLDER
+            } else {
+                "$BASE_SAVE_FOLDER/$restoredSessionFolder"
+            },
+            lastFileName = restoredPages.lastOrNull()?.fileName ?: "-",
+            capturedPages = restoredPages,
+            statusText = when {
+                !hasPermission -> "カメラ権限が必要です"
+                restoredSessionFolder.isNotBlank() -> "中断中"
+                else -> "待機中"
+            }
         )
     }
 
@@ -336,6 +359,14 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun startAutoCapture() {
+        startCaptureSession(forceNewSession = false)
+    }
+
+    private fun startNewAutoCapture() {
+        startCaptureSession(forceNewSession = true)
+    }
+
+    private fun startCaptureSession(forceNewSession: Boolean) {
         if (!uiState.hasCameraPermission) {
             requestCameraPermission()
             return
@@ -345,8 +376,17 @@ class MainActivity : ComponentActivity() {
             return
         }
 
-        val sessionFolder = DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss")
-            .format(LocalDateTime.now())
+        if (forceNewSession || uiState.sessionFolder.isBlank()) {
+            val sessionFolder = newSessionFolder()
+            uiState = uiState.copy(
+                captureCount = 0,
+                sessionFolder = sessionFolder,
+                saveFolder = "$BASE_SAVE_FOLDER/$sessionFolder",
+                lastFileName = "-",
+                capturedPages = emptyList()
+            )
+        }
+
         frameAnalyzer.reset()
         stateMachine.settings = uiState.toCaptureSettings()
         stateMachine.start(SystemClock.elapsedRealtime())
@@ -354,24 +394,22 @@ class MainActivity : ComponentActivity() {
         uiState = uiState.copy(
             isRunning = true,
             isCapturing = false,
-            captureCount = 0,
-            sessionFolder = sessionFolder,
-            saveFolder = "$BASE_SAVE_FOLDER/$sessionFolder",
-            lastFileName = "-",
-            capturedPages = emptyList(),
             statusText = "ページめくり待ち",
             errorMessage = null
         )
+        persistSessionState()
         setScreenAwake(true)
     }
 
-    private fun stopAutoCapture() {
+    private fun pauseAutoCapture() {
         stateMachine.stop()
         uiState = uiState.copy(
             isRunning = false,
             isCapturing = false,
-            statusText = "待機中"
+            statusText = if (uiState.sessionFolder.isBlank()) "待機中" else "中断中",
+            errorMessage = null
         )
+        persistSessionState()
         setScreenAwake(false)
     }
 
@@ -387,12 +425,12 @@ class MainActivity : ComponentActivity() {
     private fun ensureSession() {
         if (uiState.sessionFolder.isNotBlank()) return
 
-        val sessionFolder = DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss")
-            .format(LocalDateTime.now())
+        val sessionFolder = newSessionFolder()
         uiState = uiState.copy(
             sessionFolder = sessionFolder,
             saveFolder = "$BASE_SAVE_FOLDER/$sessionFolder"
         )
+        persistSessionState()
     }
 
     private fun handleFrameMetrics(metrics: FrameMetrics) {
@@ -463,17 +501,19 @@ class MainActivity : ComponentActivity() {
                         if (uiState.isRunning) {
                             stateMachine.markCaptureCompleted(SystemClock.elapsedRealtime())
                         }
+                        val capturedPages = uiState.capturedPages + CapturedPage(
+                            fileName = fileName,
+                            uri = outputFileResults.savedUri
+                        )
                         uiState = uiState.copy(
                             isCapturing = false,
                             captureCount = nextPageNumber,
                             lastFileName = fileName,
-                            capturedPages = uiState.capturedPages + CapturedPage(
-                                fileName = fileName,
-                                uri = outputFileResults.savedUri
-                            ),
+                            capturedPages = capturedPages,
                             statusText = "撮影完了",
                             errorMessage = null
                         )
+                        persistSessionState()
                     }
                 }
 
@@ -528,6 +568,49 @@ class MainActivity : ComponentActivity() {
             statusText = "最後の撮影を削除",
             errorMessage = null
         )
+        persistSessionState()
+    }
+
+    private fun newSessionFolder(): String {
+        return DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss")
+            .format(LocalDateTime.now())
+    }
+
+    private fun persistSessionState() {
+        val pages = JSONArray()
+        uiState.capturedPages.forEach { page ->
+            val item = JSONObject()
+                .put("fileName", page.fileName)
+            page.uri?.let { uri -> item.put("uri", uri.toString()) }
+            pages.put(item)
+        }
+
+        getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            .edit()
+            .putString(KEY_SESSION_FOLDER, uiState.sessionFolder)
+            .putString(KEY_CAPTURED_PAGES, pages.toString())
+            .apply()
+    }
+
+    private fun decodeCapturedPages(rawPages: String?): List<CapturedPage> {
+        if (rawPages.isNullOrBlank()) return emptyList()
+
+        return runCatching {
+            val pages = mutableListOf<CapturedPage>()
+            val array = JSONArray(rawPages)
+            for (index in 0 until array.length()) {
+                val item = array.optJSONObject(index) ?: continue
+                val fileName = item.optString("fileName")
+                if (fileName.isBlank()) continue
+
+                val uriText = item.optString("uri")
+                pages += CapturedPage(
+                    fileName = fileName,
+                    uri = if (uriText.isBlank()) null else Uri.parse(uriText)
+                )
+            }
+            pages
+        }.getOrDefault(emptyList())
     }
 
     private fun createOutputOptions(
@@ -631,6 +714,8 @@ class MainActivity : ComponentActivity() {
         private const val KEY_BLUR_CHECK_ENABLED = "blur_check_enabled"
         private const val KEY_DARKNESS_CHECK_ENABLED = "darkness_check_enabled"
         private const val KEY_PHOTO_ORIENTATION = "photo_orientation"
+        private const val KEY_SESSION_FOLDER = "session_folder"
+        private const val KEY_CAPTURED_PAGES = "captured_pages"
         private const val BASE_SAVE_FOLDER = "Pictures/BookAutoCapture"
     }
 }
@@ -662,6 +747,9 @@ private data class CapturedPage(
     val uri: Uri?
 )
 
+private val CaptureUiState.hasSavedSession: Boolean
+    get() = sessionFolder.isNotBlank()
+
 private enum class PhotoOrientation {
     LANDSCAPE,
     PORTRAIT
@@ -691,7 +779,8 @@ private fun BookAutoCaptureScreen(
     previewView: PreviewView,
     onRequestPermission: () -> Unit,
     onStart: () -> Unit,
-    onStop: () -> Unit,
+    onPause: () -> Unit,
+    onStartNewSession: () -> Unit,
     onManualCapture: () -> Unit,
     onDeleteLastCapture: () -> Unit,
     onSoundEnabledChange: (Boolean) -> Unit,
@@ -725,7 +814,8 @@ private fun BookAutoCaptureScreen(
                     showSettings = showSettings,
                     onToggleSettings = { showSettings = !showSettings },
                     onStart = onStart,
-                    onStop = onStop,
+                    onPause = onPause,
+                    onStartNewSession = onStartNewSession,
                     onManualCapture = onManualCapture,
                     onDeleteLastCapture = onDeleteLastCapture,
                     onSoundEnabledChange = onSoundEnabledChange,
@@ -755,7 +845,8 @@ private fun BookAutoCaptureScreen(
                     showSettings = showSettings,
                     onToggleSettings = { showSettings = !showSettings },
                     onStart = onStart,
-                    onStop = onStop,
+                    onPause = onPause,
+                    onStartNewSession = onStartNewSession,
                     onManualCapture = onManualCapture,
                     onDeleteLastCapture = onDeleteLastCapture,
                     onSoundEnabledChange = onSoundEnabledChange,
@@ -804,7 +895,8 @@ private fun ControlPanel(
     showSettings: Boolean,
     onToggleSettings: () -> Unit,
     onStart: () -> Unit,
-    onStop: () -> Unit,
+    onPause: () -> Unit,
+    onStartNewSession: () -> Unit,
     onManualCapture: () -> Unit,
     onDeleteLastCapture: () -> Unit,
     onSoundEnabledChange: (Boolean) -> Unit,
@@ -836,7 +928,7 @@ private fun ControlPanel(
             PrimaryCaptureButton(
                 uiState = uiState,
                 onStart = onStart,
-                onStop = onStop
+                onPause = onPause
             )
 
             FlowRow(
@@ -854,6 +946,14 @@ private fun ControlPanel(
                     onClick = onDeleteLastCapture
                 ) {
                     Text("最後を削除")
+                }
+                if (uiState.hasSavedSession && !uiState.isRunning && !uiState.isCapturing) {
+                    OutlinedButton(
+                        enabled = uiState.hasCameraPermission && uiState.cameraReady,
+                        onClick = onStartNewSession
+                    ) {
+                        Text("新規開始")
+                    }
                 }
                 OutlinedButton(onClick = onToggleSettings) {
                     Text(if (showSettings) "詳細設定を閉じる" else "詳細設定")
@@ -915,12 +1015,12 @@ private fun ControlPanel(
 private fun PrimaryCaptureButton(
     uiState: CaptureUiState,
     onStart: () -> Unit,
-    onStop: () -> Unit
+    onPause: () -> Unit
 ) {
     val isStopButton = uiState.isRunning
     Button(
         enabled = isStopButton || (uiState.hasCameraPermission && uiState.cameraReady),
-        onClick = if (isStopButton) onStop else onStart,
+        onClick = if (isStopButton) onPause else onStart,
         modifier = Modifier
             .fillMaxWidth()
             .height(54.dp),
@@ -935,7 +1035,11 @@ private fun PrimaryCaptureButton(
         }
     ) {
         Text(
-            text = if (isStopButton) "停止" else "開始",
+            text = when {
+                isStopButton -> "中断"
+                uiState.hasSavedSession -> "再開"
+                else -> "開始"
+            },
             style = MaterialTheme.typography.titleMedium,
             fontWeight = FontWeight.SemiBold
         )

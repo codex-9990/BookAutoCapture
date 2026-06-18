@@ -1,6 +1,6 @@
 # Development Status
 
-Last updated: 2026-06-15
+Last updated: 2026-06-18
 
 ## Current Snapshot
 
@@ -14,6 +14,9 @@ BookAutoCapture is an Android/Kotlin app for fixed-position book capture. The cu
 - Sequential filenames such as `page_0001.jpg`
 - In-session saved page list with recent filenames
 - Delete-last-capture action for the current session
+- Pause/resume flow for the current capture session
+- Restored session folder, recent page list, and next page number after app restart
+- New-session action for starting another book without deleting old images
 - CameraX `ImageAnalysis` using lightweight luma-frame sampling
 - Auto-capture state machine:
   - `IDLE`
@@ -24,7 +27,7 @@ BookAutoCapture is an Android/Kotlin app for fixed-position book capture. The cu
   - `COOLDOWN`
 - Stable-duration and minimum-capture-interval settings
 - Sensitivity setting: low, medium, high
-- Simplified control panel with one primary start/stop action
+- Simplified control panel with one primary start/pause/resume action
 - Photo orientation selector with landscape as the default and portrait as an option
 - Live quality panel for brightness, blur, and stability before capture
 - Optional blur and darkness checks
@@ -46,7 +49,7 @@ Run locally from the repository root.
 .\gradlew.bat assembleDebug
 ```
 
-Both commands passed on 2026-06-14.
+Both commands passed on 2026-06-18.
 
 ## Generated APK
 
@@ -63,7 +66,7 @@ Build outputs are intentionally ignored by Git. GitHub Actions can upload a debu
 - Real-device behavior has not been fully tuned across multiple Android vendors.
 - Quality, blur, and darkness thresholds are simple luma-based heuristics and will need real capture samples.
 - The UI is functional, but it still needs real-device polish on small phones and tablets.
-- The saved page list and delete-last action are in-memory for the current app session only.
+- Restored session history depends on the MediaStore URIs recorded by the app. If files are changed externally, the list may become stale.
 - No OCR, PDF export, page review screen, or session gallery exists yet.
 - No release signing setup exists yet.
 
@@ -88,4 +91,7 @@ Use an actual Android device and verify:
 8. Quality panel changes between good, caution, and blocked in realistic lighting and motion.
 9. No UI panel overlaps the camera preview while scrolling detailed settings.
 10. The saved page list updates after each capture.
-11. `最後を削除` removes the newest saved image after auto capture is stopped.
+11. `中断` pauses auto capture and shows `再開`.
+12. After closing and reopening the app, `再開` continues in the same folder with the next page number.
+13. `新規開始` starts another session from `page_0001.jpg`.
+14. `最後を削除` removes the newest saved image after auto capture is paused.

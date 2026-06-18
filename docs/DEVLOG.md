@@ -2,6 +2,16 @@
 
 This file is the chronological memory of the project. Keep entries short, concrete, and tied to verified behavior.
 
+## 2026-06-18
+
+### Resumable Capture Sessions
+
+- Changed the running primary action from stop to `中断`.
+- Added `再開` behavior so a paused session continues in the same folder.
+- Persisted the current session folder and captured page list in app preferences.
+- Restored the captured page count, last filename, and next page number after app restart.
+- Added `新規開始` for beginning another book without deleting old captured images.
+
 ## 2026-06-15
 
 ### Photo Orientation
