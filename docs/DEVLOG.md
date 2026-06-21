@@ -2,6 +2,14 @@
 
 This file is the chronological memory of the project. Keep entries short, concrete, and tied to verified behavior.
 
+## 2026-06-21
+
+### Preview Orientation Match
+
+- Made the CameraX preview target rotation follow the selected photo orientation.
+- Added a landscape or portrait preview frame so the camera view matches `写真の向き`.
+- Kept the saved JPEG orientation and visible preview in sync when switching between `横長` and `縦長`.
+
 ## 2026-06-18
 
 ### Resumable Capture Sessions

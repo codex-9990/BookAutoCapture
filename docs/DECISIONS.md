@@ -133,3 +133,14 @@ Both actions can surprise users during repetitive capture work. A lightweight co
 
 Consequence:
 The app is safer for first-time users. A true undo flow remains a future improvement if real-device use shows deletion mistakes are common.
+
+## 2026-06-21: Match Preview to Photo Orientation
+
+Decision:
+Rotate and frame the live preview according to the selected photo orientation.
+
+Why:
+Users expect the camera view to match the image that will be saved. Showing a portrait preview while saving landscape photos makes framing an open book confusing.
+
+Consequence:
+The preview now letterboxes into a landscape or portrait frame. Device-specific CameraX behavior should still be checked on real hardware.

@@ -1,6 +1,6 @@
 # Development Status
 
-Last updated: 2026-06-18
+Last updated: 2026-06-21
 
 ## Current Snapshot
 
@@ -32,6 +32,7 @@ BookAutoCapture is an Android/Kotlin app for fixed-position book capture. The cu
 - Capture overview panel showing current mode, status, saved count, next filename, and photo orientation
 - Secondary actions grouped under one `操作` section
 - Photo orientation selector with landscape as the default and portrait as an option
+- Preview frame and CameraX preview rotation follow the selected photo orientation
 - Live quality panel for brightness, blur, and stability before capture
 - Optional blur and darkness checks
 - Capture-complete sound toggle
@@ -90,12 +91,13 @@ Use an actual Android device and verify:
 4. Screen stays awake while auto capture is running.
 5. Saved image orientation is correct in the gallery.
 6. Landscape photo orientation is the default.
-7. Portrait photo orientation can be selected and saved correctly.
-8. Quality panel changes between good, caution, and blocked in realistic lighting and motion.
-9. No UI panel overlaps the camera preview while scrolling detailed settings.
-10. The saved page list updates after each capture.
-11. `中断する` pauses auto capture and shows `続きから撮る`.
-12. After closing and reopening the app, `続きから撮る` continues in the same folder with the next page number.
-13. `新しい本を始める` asks for confirmation, then starts another session from `page_0001.jpg`.
-14. `最後を削除` asks for confirmation, then removes the newest saved image after auto capture is paused.
-15. The first controls visible in the panel are overview, primary action, and quality feedback.
+7. Portrait photo orientation can be selected, previewed, and saved correctly.
+8. Landscape photo orientation shows a landscape preview frame even when the device is held portrait.
+9. Quality panel changes between good, caution, and blocked in realistic lighting and motion.
+10. No UI panel overlaps the camera preview while scrolling detailed settings.
+11. The saved page list updates after each capture.
+12. `中断する` pauses auto capture and shows `続きから撮る`.
+13. After closing and reopening the app, `続きから撮る` continues in the same folder with the next page number.
+14. `新しい本を始める` asks for confirmation, then starts another session from `page_0001.jpg`.
+15. `最後を削除` asks for confirmation, then removes the newest saved image after auto capture is paused.
+16. The first controls visible in the panel are overview, primary action, and quality feedback.

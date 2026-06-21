@@ -33,8 +33,10 @@ import androidx.camera.core.resolutionselector.ResolutionStrategy
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
@@ -107,7 +109,9 @@ class MainActivity : ComponentActivity() {
     private val cameraExecutor = Executors.newSingleThreadExecutor()
     private val stateMachine = AutoCaptureStateMachine()
     private var cameraProvider: ProcessCameraProvider? = null
+    private var previewUseCase: Preview? = null
     private var imageCapture: ImageCapture? = null
+    private var imageAnalysis: ImageAnalysis? = null
     private var camera: Camera? = null
     private var uiState by mutableStateOf(CaptureUiState())
 
@@ -287,16 +291,17 @@ class MainActivity : ComponentActivity() {
                     val provider = providerFuture.get()
                     cameraProvider = provider
 
-                    val rotation = currentRotation()
+                    val captureRotation = captureTargetRotation()
                     val preview = Preview.Builder()
-                        .setTargetRotation(rotation)
+                        .setTargetRotation(captureRotation)
                         .build()
                         .also { it.setSurfaceProvider(previewView.surfaceProvider) }
+                    previewUseCase = preview
 
                     val capture = ImageCapture.Builder()
                         .setCaptureMode(ImageCapture.CAPTURE_MODE_MAXIMIZE_QUALITY)
                         .setJpegQuality(100)
-                        .setTargetRotation(captureTargetRotation())
+                        .setTargetRotation(captureRotation)
                         .build()
                     imageCapture = capture
 
@@ -311,10 +316,11 @@ class MainActivity : ComponentActivity() {
                                 )
                                 .build()
                         )
-                        .setTargetRotation(rotation)
+                        .setTargetRotation(captureRotation)
                         .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
                         .build()
                         .also { it.setAnalyzer(cameraExecutor, frameAnalyzer) }
+                    imageAnalysis = analysis
 
                     provider.unbindAll()
                     camera = provider.bindToLifecycle(
@@ -662,7 +668,10 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun updateTargetRotation() {
-        imageCapture?.targetRotation = captureTargetRotation()
+        val rotation = captureTargetRotation()
+        previewUseCase?.targetRotation = rotation
+        imageCapture?.targetRotation = rotation
+        imageAnalysis?.targetRotation = rotation
     }
 
     private fun setScreenAwake(keepAwake: Boolean) {
@@ -887,15 +896,30 @@ private fun PreviewPane(
     onRequestPermission: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    Box(
+    BoxWithConstraints(
         modifier = modifier
             .clipToBounds()
             .background(Color.Black)
     ) {
         if (uiState.hasCameraPermission) {
+            val targetRatio = uiState.photoOrientation.previewAspectRatio()
+            val availableRatio = if (maxHeight.value == 0f) {
+                targetRatio
+            } else {
+                maxWidth.value / maxHeight.value
+            }
+            val previewModifier = if (availableRatio > targetRatio) {
+                Modifier
+                    .fillMaxHeight()
+                    .aspectRatio(targetRatio)
+            } else {
+                Modifier
+                    .fillMaxWidth()
+                    .aspectRatio(targetRatio)
+            }
             AndroidView(
                 factory = { previewView },
-                modifier = Modifier.fillMaxSize()
+                modifier = previewModifier.align(Alignment.Center)
             )
         } else {
             PermissionPanel(onRequestPermission = onRequestPermission)
@@ -1620,6 +1644,13 @@ private fun PhotoOrientation.displayName(): String {
     return when (this) {
         PhotoOrientation.LANDSCAPE -> "横長"
         PhotoOrientation.PORTRAIT -> "縦長"
+    }
+}
+
+private fun PhotoOrientation.previewAspectRatio(): Float {
+    return when (this) {
+        PhotoOrientation.LANDSCAPE -> 16f / 9f
+        PhotoOrientation.PORTRAIT -> 3f / 4f
     }
 }
 
