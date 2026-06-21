@@ -122,3 +122,14 @@ The user operates the app while handling a physical book, so the screen should a
 
 Consequence:
 Secondary actions remain available, but manual capture, delete-last, new-book, and settings are grouped together below the main capture flow.
+
+## 2026-06-21: Confirm Destructive Session Actions
+
+Decision:
+Ask for confirmation before deleting the latest photo or starting a new book.
+
+Why:
+Both actions can surprise users during repetitive capture work. A lightweight confirmation protects against accidental taps without adding a complex undo system.
+
+Consequence:
+The app is safer for first-time users. A true undo flow remains a future improvement if real-device use shows deletion mistakes are common.

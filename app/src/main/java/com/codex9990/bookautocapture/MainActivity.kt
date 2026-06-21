@@ -51,6 +51,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.FilterChip
@@ -60,10 +61,12 @@ import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -1133,6 +1136,59 @@ private fun QuickActionsPanel(
     onDeleteLastCapture: () -> Unit,
     onStartNewSession: () -> Unit
 ) {
+    var showDeleteConfirm by remember { mutableStateOf(false) }
+    var showNewSessionConfirm by remember { mutableStateOf(false) }
+
+    if (showDeleteConfirm) {
+        AlertDialog(
+            onDismissRequest = { showDeleteConfirm = false },
+            title = { Text("最後の写真を削除しますか？") },
+            text = {
+                Text("${uiState.lastFileName} を削除します。削除後は元に戻せません。")
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showDeleteConfirm = false
+                        onDeleteLastCapture()
+                    }
+                ) {
+                    Text("削除する")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDeleteConfirm = false }) {
+                    Text("戻る")
+                }
+            }
+        )
+    }
+
+    if (showNewSessionConfirm) {
+        AlertDialog(
+            onDismissRequest = { showNewSessionConfirm = false },
+            title = { Text("新しい本を始めますか？") },
+            text = {
+                Text("今のセッションは保存済みです。新しい保存先を作り、page_0001.jpg から撮影します。")
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showNewSessionConfirm = false
+                        onStartNewSession()
+                    }
+                ) {
+                    Text("始める")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showNewSessionConfirm = false }) {
+                    Text("戻る")
+                }
+            }
+        )
+    }
+
     Surface(
         color = MaterialTheme.colorScheme.surface,
         shape = RoundedCornerShape(8.dp),
@@ -1161,16 +1217,16 @@ private fun QuickActionsPanel(
                 }
                 OutlinedButton(
                     enabled = uiState.capturedPages.isNotEmpty() && !uiState.isRunning && !uiState.isCapturing,
-                    onClick = onDeleteLastCapture
+                    onClick = { showDeleteConfirm = true }
                 ) {
                     Text("最後を削除")
                 }
                 if (uiState.hasSavedSession && !uiState.isRunning && !uiState.isCapturing) {
                     OutlinedButton(
                         enabled = uiState.hasCameraPermission && uiState.cameraReady,
-                        onClick = onStartNewSession
+                        onClick = { showNewSessionConfirm = true }
                     ) {
-                        Text("新しい本")
+                        Text("新しい本を始める")
                     }
                 }
                 OutlinedButton(onClick = onToggleSettings) {

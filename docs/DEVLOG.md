@@ -18,6 +18,7 @@ This file is the chronological memory of the project. Keep entries short, concre
 - Renamed the primary actions to `撮影を開始`, `中断する`, and `続きから撮る`.
 - Grouped manual capture, delete-last, new-book, and settings actions under one `操作` section.
 - Moved the shutter-sound notice into detailed settings to reduce visual noise during capture.
+- Added confirmation dialogs before deleting the latest photo or starting a new book.
 
 ## 2026-06-15
 

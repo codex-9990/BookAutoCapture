@@ -17,6 +17,7 @@ BookAutoCapture is an Android/Kotlin app for fixed-position book capture. The cu
 - Pause/resume flow for the current capture session
 - Restored session folder, recent page list, and next page number after app restart
 - New-session action for starting another book without deleting old images
+- Confirmation dialogs for delete-last and new-session actions
 - CameraX `ImageAnalysis` using lightweight luma-frame sampling
 - Auto-capture state machine:
   - `IDLE`
@@ -95,6 +96,6 @@ Use an actual Android device and verify:
 10. The saved page list updates after each capture.
 11. `中断する` pauses auto capture and shows `続きから撮る`.
 12. After closing and reopening the app, `続きから撮る` continues in the same folder with the next page number.
-13. `新しい本` starts another session from `page_0001.jpg`.
-14. `最後を削除` removes the newest saved image after auto capture is paused.
+13. `新しい本を始める` asks for confirmation, then starts another session from `page_0001.jpg`.
+14. `最後を削除` asks for confirmation, then removes the newest saved image after auto capture is paused.
 15. The first controls visible in the panel are overview, primary action, and quality feedback.
